@@ -1,0 +1,1 @@
+使用taro+mobx+typescript+tailwindcss4开发微信小程序，确保代码质量和性能。

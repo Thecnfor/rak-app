@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+view, scroll-view, text, image, button, input, label, navigator {
+  box-sizing: border-box;
+}
