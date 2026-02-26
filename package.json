@@ -1,8 +1,8 @@
 {
-  "name": "green",
+  "name": "raro",
   "version": "1.0.0",
   "private": true,
-  "description": "xrak · green",
+  "description": "xrak · Raro",
   "templateInfo": {
     "name": "mobx",
     "typescript": true,
