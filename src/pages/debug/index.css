@@ -1,0 +1,8 @@
+/* Log console monospace */
+.font-mono {
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+.break-all {
+  word-break: break-all;
+}

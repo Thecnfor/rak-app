@@ -3,7 +3,7 @@ import { View, Text, Button, Input } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { bleService } from '../../services/ble'
 import { store } from '../../store/simple'
-import { encodeWiFiConfig, decodeBLEMessage, arrayBufferToHex } from '../../utils/parser'
+import { encodeWiFiConfig, decodeBLEMessage } from '../../utils/parser'
 import './index.css'
 
 interface ConfigState {
@@ -28,8 +28,6 @@ class Config extends Component<PropsWithChildren, ConfigState> {
       Taro.redirectTo({ url: '/pages/index/index' })
       return
     }
-
-    // 监听 BLE 数据
     bleService.on('dataReceived', this.handleDataReceived)
   }
 
@@ -68,7 +66,7 @@ class Config extends Component<PropsWithChildren, ConfigState> {
   handleSubmit = async () => {
     const { ssid, password } = this.state
     if (!ssid.trim()) {
-      Taro.showToast({ title: '请输入WiFi名称', icon: 'none' })
+      Taro.showToast({ title: '请输入 WiFi 名称', icon: 'none' })
       return
     }
 
@@ -82,7 +80,6 @@ class Config extends Component<PropsWithChildren, ConfigState> {
       const data = encodeWiFiConfig(ssid.trim(), password)
       await bleService.write(data)
 
-      // 30秒超时
       this.configTimeout = setTimeout(() => {
         if (store.provisioningState === 'configuring') {
           store.setProvisioningState('failed')
@@ -103,7 +100,6 @@ class Config extends Component<PropsWithChildren, ConfigState> {
     try {
       await bleService.disconnect()
     } catch (e: any) {
-      // 断开连接失败时仍重置状态，确保不卡在已连接状态
       console.warn('断开连接失败:', e.message)
     }
     store.reset()
@@ -115,88 +111,90 @@ class Config extends Component<PropsWithChildren, ConfigState> {
     const device = store.selectedDevice
 
     return (
-      <View className="min-h-screen bg-gray-50">
-        <View className="p-4">
-          <View className="bg-white rounded-lg shadow-sm p-4 mb-4">
+      <View className="min-h-screen bg-[#FAF8F5]">
+        <View className="px-5 pt-6 pb-4">
+          {/* Header */}
+          <Text className="text-[11px] tracking-[0.2em] text-[#999] uppercase mb-1">Raro</Text>
+          <Text className="text-2xl font-semibold text-[#1A1A1A] mb-1">WiFi 配置</Text>
+          <Text className="text-sm text-[#999] mb-6">
+            为设备配置网络连接
+          </Text>
+
+          {/* Connected Device */}
+          <View className="bg-white rounded-xl p-4 mb-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <View className="flex items-center justify-between mb-3">
-              <Text className="text-lg font-bold text-gray-900">已连接设备</Text>
-              <View className="bg-green-100 px-2 py-1 rounded">
-                <Text className="text-xs text-green-700">已连接</Text>
+              <Text className="text-xs tracking-[0.15em] text-[#999] uppercase">已连接设备</Text>
+              <View className="flex items-center gap-1.5">
+                <View className="w-1.5 h-1.5 rounded-full bg-[#1A1A1A]" />
+                <Text className="text-[10px] text-[#999]">在线</Text>
               </View>
             </View>
 
             {device && (
-              <View className="bg-gray-50 rounded-lg p-3 mb-3">
-                <Text className="font-medium text-gray-900">{device.name}</Text>
-                <Text className="text-xs text-gray-400 mt-1">{device.deviceId}</Text>
+              <View className="mb-3">
+                <Text className="text-[#1A1A1A] font-medium text-sm">{device.name}</Text>
+                <Text className="text-[#CCC] text-[10px] mt-0.5 font-mono">{device.deviceId}</Text>
               </View>
             )}
 
             <Button
-              className="w-full bg-red-500 text-white rounded-lg py-2 text-sm"
+              className="w-full bg-white text-[#999] rounded-xl py-2.5 text-xs font-medium border border-[#E5E2DD]"
               onClick={this.handleDisconnect}
             >
               断开连接
             </Button>
           </View>
 
-          <View className="bg-white rounded-lg shadow-sm p-4 mb-4">
-            <Text className="text-lg font-bold text-gray-900 mb-4">WiFi 配置</Text>
+          {/* WiFi Form */}
+          <View className="bg-white rounded-xl p-4 mb-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <Text className="text-xs tracking-[0.15em] text-[#999] uppercase mb-4">网络配置</Text>
 
             <View className="mb-4">
-              <Text className="text-sm font-medium text-gray-700 mb-2">WiFi 名称 (SSID)</Text>
+              <Text className="text-[10px] text-[#999] mb-1.5 tracking-wide">SSID</Text>
               <Input
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                placeholder="请输入WiFi名称"
+                className="w-full border-b border-[#E5E2DD] py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#CCC]"
+                placeholder="WiFi 名称"
                 value={ssid}
                 onInput={this.handleSSIDChange}
               />
             </View>
 
-            <View className="mb-4">
-              <Text className="text-sm font-medium text-gray-700 mb-2">WiFi 密码</Text>
-              <View className="relative">
+            <View className="mb-5">
+              <Text className="text-[10px] text-[#999] mb-1.5 tracking-wide">密码</Text>
+              <View className="flex items-center border-b border-[#E5E2DD]">
                 <Input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-16"
-                  placeholder="请输入WiFi密码"
+                  className="flex-1 py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#CCC]"
+                  placeholder="WiFi 密码"
                   password={!showPassword}
                   value={password}
                   onInput={this.handlePasswordChange}
                 />
-                <Button
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 text-blue-600 text-sm px-2 py-1"
+                <Text
+                  className="text-[10px] text-[#999] pl-2"
                   onClick={this.toggleShowPassword}
                 >
                   {showPassword ? '隐藏' : '显示'}
-                </Button>
+                </Text>
               </View>
             </View>
 
-            <View className="bg-yellow-50 rounded-lg p-3 mb-4">
-              <Text className="text-yellow-800 text-sm">
-                <Text className="font-medium">注意：</Text>
-                请确保输入正确的 WiFi 信息，设备将使用此配置连接网络。
-              </Text>
-            </View>
-
             <Button
-              className={`w-full rounded-lg py-3 text-white font-medium ${
-                sending ? 'bg-gray-400' : 'bg-blue-600'
+              className={`w-full rounded-xl py-3.5 text-sm font-medium border-0 ${
+                sending
+                  ? 'bg-[#E5E2DD] text-[#999]'
+                  : 'bg-[#1A1A1A] text-white'
               }`}
               onClick={this.handleSubmit}
               disabled={sending}
             >
-              {sending ? '正在发送配置...' : '开始配网'}
+              {sending ? '正在发送...' : '开始配网'}
             </Button>
           </View>
 
-          <View className="bg-blue-50 rounded-lg p-4">
-            <Text className="text-blue-800 font-medium mb-2">配网说明</Text>
-            <Text className="text-blue-600 text-sm">
-              1. 输入您要连接的 WiFi 名称和密码{'\n'}
-              2. 点击"开始配网"发送配置到设备{'\n'}
-              3. 设备将尝试连接 WiFi 并返回结果{'\n'}
-              4. 配网成功后设备将自动连接网络
+          {/* Note */}
+          <View className="px-1">
+            <Text className="text-[11px] text-[#BBB] leading-relaxed">
+              请确保输入正确的 WiFi 信息。设备仅支持 2.4GHz 频段网络。
             </Text>
           </View>
         </View>

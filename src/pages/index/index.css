@@ -1,7 +1,12 @@
+.scanning-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1A1A1A;
+  animation: pulse 1.5s ease-in-out infinite;
+}
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-  color: transparent;
+@keyframes pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
 }

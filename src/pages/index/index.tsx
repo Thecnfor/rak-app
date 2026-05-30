@@ -80,104 +80,115 @@ class Index extends Component<PropsWithChildren, IndexState> {
     return '弱'
   }
 
-  getSignalColor(rssi: number): string {
-    if (rssi >= -50) return 'text-green-600'
-    if (rssi >= -70) return 'text-yellow-600'
-    return 'text-red-600'
+  getSignalBars(rssi: number): number {
+    if (rssi >= -50) return 3
+    if (rssi >= -70) return 2
+    return 1
   }
 
   render() {
     const { devices, isScanning, error } = this.state
 
     return (
-      <View className="min-h-screen bg-gray-50">
-        <View className="p-4">
-          <View className="bg-white rounded-lg shadow-sm p-4 mb-4">
-            <Text className="text-lg font-bold text-gray-900 mb-2">ESP32-C3 蓝牙配网</Text>
-            <Text className="text-sm text-gray-500 mb-4">
-              扫描附近的 ESP32-C3 设备进行配网配置
-            </Text>
+      <View className="min-h-screen bg-[#FAF8F5]">
+        <View className="px-5 pt-6 pb-4">
+          {/* Header */}
+          <Text className="text-[11px] tracking-[0.2em] text-[#999] uppercase mb-1">Raro</Text>
+          <Text className="text-2xl font-semibold text-[#1A1A1A] mb-1">设备扫描</Text>
+          <Text className="text-sm text-[#999] mb-6">
+            搜索附近的 ESP32-C3 设备
+          </Text>
 
-            {error && (
-              <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <Text className="text-red-600 text-sm">{error}</Text>
-              </View>
-            )}
-
-            <View className="flex gap-2">
-              {!isScanning ? (
-                <Button
-                  className="flex-1 bg-blue-600 text-white rounded-lg py-3"
-                  onClick={this.handleStartScan}
-                >
-                  开始扫描
-                </Button>
-              ) : (
-                <Button
-                  className="flex-1 bg-gray-600 text-white rounded-lg py-3"
-                  onClick={this.handleStopScan}
-                >
-                  停止扫描
-                </Button>
-              )}
-            </View>
-
-            {isScanning && (
-              <View className="flex items-center justify-center mt-3">
-                <View className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2" />
-                <Text className="text-blue-600 text-sm">正在扫描...</Text>
-              </View>
+          {/* Scan Button */}
+          <View className="mb-6">
+            {!isScanning ? (
+              <Button
+                className="w-full bg-[#1A1A1A] text-white rounded-xl py-3.5 text-sm font-medium border-0"
+                onClick={this.handleStartScan}
+              >
+                开始扫描
+              </Button>
+            ) : (
+              <Button
+                className="w-full bg-white text-[#1A1A1A] rounded-xl py-3.5 text-sm font-medium border border-[#E5E2DD]"
+                onClick={this.handleStopScan}
+              >
+                停止扫描
+              </Button>
             )}
           </View>
 
-          <View className="bg-white rounded-lg shadow-sm p-4">
-            <Text className="font-semibold text-gray-900 mb-3">
-              发现的设备 ({devices.length})
-            </Text>
+          {/* Scanning Indicator */}
+          {isScanning && (
+            <View className="flex items-center justify-center mb-6">
+              <View className="scanning-dot mr-2" />
+              <Text className="text-[#999] text-xs tracking-wide">正在搜索设备...</Text>
+            </View>
+          )}
+
+          {/* Error */}
+          {error && (
+            <View className="border-l-2 border-[#1A1A1A] pl-3 mb-6">
+              <Text className="text-[#666] text-sm">{error}</Text>
+            </View>
+          )}
+
+          {/* Device List */}
+          <View>
+            <View className="flex justify-between items-center mb-3">
+              <Text className="text-xs tracking-[0.15em] text-[#999] uppercase">
+                发现的设备
+              </Text>
+              <Text className="text-xs text-[#BBB]">{devices.length}</Text>
+            </View>
 
             {devices.length === 0 ? (
-              <View className="py-8 text-center">
-                <Text className="text-gray-400">
-                  {isScanning ? '正在搜索设备...' : '暂无设备，请先开始扫描'}
+              <View className="py-12 items-center">
+                <Text className="text-[#CCC] text-sm">
+                  {isScanning ? '' : '暂无设备'}
                 </Text>
               </View>
             ) : (
-              <ScrollView className="max-h-96">
+              <View>
                 {devices.map((device) => (
                   <View
                     key={device.deviceId}
-                    className="border border-gray-200 rounded-lg p-3 mb-2"
+                    className="bg-white rounded-xl p-4 mb-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
                     onClick={() => this.handleConnectDevice(device)}
                   >
-                    <View className="flex justify-between items-start">
+                    <View className="flex justify-between items-center">
                       <View className="flex-1">
-                        <Text className="font-medium text-gray-900">{device.name}</Text>
-                        <Text className="text-xs text-gray-400 mt-1">
+                        <Text className="text-[#1A1A1A] font-medium text-sm">{device.name}</Text>
+                        <Text className="text-[#CCC] text-[10px] mt-1 font-mono">
                           {device.deviceId}
                         </Text>
                       </View>
-                      <View className="text-right">
-                        <Text className={`text-sm font-medium ${this.getSignalColor(device.RSSI)}`}>
-                          {device.RSSI} dBm
-                        </Text>
-                        <Text className="text-xs text-gray-400">
-                          信号{this.getSignalStrength(device.RSSI)}
-                        </Text>
+                      <View className="flex items-center gap-1.5">
+                        {[1, 2, 3].map(bar => (
+                          <View
+                            key={bar}
+                            className={`w-[3px] rounded-full ${
+                              bar <= this.getSignalBars(device.RSSI)
+                                ? 'bg-[#1A1A1A]'
+                                : 'bg-[#E5E2DD]'
+                            }`}
+                            style={{ height: `${bar * 5 + 2}px` }}
+                          />
+                        ))}
                       </View>
                     </View>
                   </View>
                 ))}
-              </ScrollView>
+              </View>
             )}
           </View>
+        </View>
 
-          <View className="mt-4 bg-blue-50 rounded-lg p-4">
-            <Text className="text-blue-800 font-medium mb-2">使用说明</Text>
-            <Text className="text-blue-600 text-sm">
-              1. 确保 ESP32-C3 设备已开启并处于配网模式{'\n'}
-              2. 点击"开始扫描"搜索附近的 BLE 设备{'\n'}
-              3. 从列表中选择要配网的设备{'\n'}
-              4. 输入 WiFi 信息完成配网
+        {/* Footer */}
+        <View className="px-5 pb-8 mt-auto">
+          <View className="border-t border-[#EEE] pt-4">
+            <Text className="text-[10px] text-[#CCC] text-center">
+              Raro · ESP32-C3 蓝牙配网工具
             </Text>
           </View>
         </View>
