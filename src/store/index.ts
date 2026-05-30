@@ -1,1 +1,1 @@
-export default {};
+export { store } from './simple'
