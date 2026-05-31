@@ -5,6 +5,9 @@ export const BLE_CHAR_WRITE_UUID = '0000fff1-0000-1000-8000-00805f9b34fb'
 export const BLE_CHAR_NOTIFY_UUID = '0000fff2-0000-1000-8000-00805f9b34fb'
 export const BLE_CHAR_READ_UUID = '0000fff3-0000-1000-8000-00805f9b34fb'
 
+const CONNECT_TIMEOUT_MS = 10000
+const MTU_SIZE = 512
+
 export interface BLEDevice {
   deviceId: string
   name: string
@@ -25,6 +28,7 @@ class BLEService {
   private deviceId: string = ''
   private isConnected: boolean = false
   private listeners: Map<string, BLEEventCallback[]> = new Map()
+  private connectTimer: ReturnType<typeof setTimeout> | null = null
 
   on(event: string, callback: BLEEventCallback) {
     if (!this.listeners.has(event)) {
@@ -110,11 +114,28 @@ class BLEService {
     this.deviceId = deviceId
     this.emit('connectionStateChange', { state: 'connecting', deviceId })
 
+    // Connection timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      this.connectTimer = setTimeout(() => {
+        reject({ code: -1, message: '连接超时' })
+      }, CONNECT_TIMEOUT_MS)
+    })
+
     try {
-      await Taro.createBLEConnection({ deviceId })
+      await Promise.race([
+        Taro.createBLEConnection({ deviceId }),
+        timeoutPromise,
+      ])
+
+      if (this.connectTimer) {
+        clearTimeout(this.connectTimer)
+        this.connectTimer = null
+      }
+
       this.isConnected = true
       this.emit('connectionStateChange', { state: 'connected', deviceId })
 
+      // Listen for connection state changes
       Taro.onBLEConnectionStateChange((res) => {
         this.isConnected = res.connected
         this.emit('connectionStateChange', {
@@ -122,9 +143,20 @@ class BLEService {
           deviceId: res.deviceId,
         })
       })
+
+      // Negotiate MTU for larger payloads
+      try {
+        await Taro.setBLEMTU({ deviceId, mtu: MTU_SIZE })
+      } catch {
+        // MTU negotiation optional, continue with default
+      }
     } catch (error: any) {
+      if (this.connectTimer) {
+        clearTimeout(this.connectTimer)
+        this.connectTimer = null
+      }
       this.emit('connectionStateChange', { state: 'disconnected', deviceId })
-      this.emit('error', { code: error.errCode, message: error.errMsg })
+      this.emit('error', { code: error.errCode ?? -1, message: error.errMsg ?? error.message })
       throw error
     }
   }
@@ -145,7 +177,7 @@ class BLEService {
     }
   }
 
-  async getServices(): Promise<Taro.BLEService[]> {
+  async getServices(): Promise<any[]> {
     if (!this.deviceId) throw new Error('Device not connected')
 
     try {
@@ -157,7 +189,7 @@ class BLEService {
     }
   }
 
-  async getCharacteristics(serviceId: string): Promise<Taro.BLECharacteristic[]> {
+  async getCharacteristics(serviceId: string): Promise<any[]> {
     if (!this.deviceId) throw new Error('Device not connected')
 
     try {
@@ -211,7 +243,7 @@ class BLEService {
     }
   }
 
-  async read(): Promise<ArrayBuffer> {
+  async read(): Promise<any> {
     if (!this.deviceId) throw new Error('Device not connected')
 
     try {
@@ -220,7 +252,7 @@ class BLEService {
         serviceId: BLE_SERVICE_UUID,
         characteristicId: BLE_CHAR_READ_UUID,
       })
-      return res.value
+      return res
     } catch (error: any) {
       this.emit('error', { code: error.errCode, message: error.errMsg })
       throw error

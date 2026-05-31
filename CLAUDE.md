@@ -54,7 +54,7 @@ Pages do **not** use `@inject` or `@observer` decorators — they import `simple
 
 All core services are **singletons** exported from their modules:
 
-- `bleService` (`services/ble.ts`) — wraps Taro BLE APIs with custom event emitter (`Map<string, callback[]>`)
+- `bleService` (`services/ble.ts`) — wraps Taro BLE APIs with custom event emitter (`Map<string, callback[]>`). Events: `adapterStateChange`, `scanStateChange`, `deviceFound`, `connectionStateChange`, `dataSent`, `dataReceived`, `error`
 - `simpleStore` (`store/simple.ts`) — global state with pub/sub notifications
 - `logger` (`utils/logger.ts`) — in-memory log buffer with pub/sub listeners
 
@@ -70,7 +70,7 @@ Single service UUID `0000fff0-0000-1000-8000-00805f9b34fb` with three characteri
 
 Data format: JSON strings encoded as ArrayBuffer (see `utils/parser.ts`). Message types are discriminated by a `type` field: `wifi_config`, `config_result`, `device_status`.
 
-Note: `arrayBufferToString`, `stringToArrayBuffer`, `arrayBufferToHex` are duplicated in both `services/ble.ts` (static methods) and `utils/parser.ts`.
+Note: `arrayBufferToString`, `stringToArrayBuffer`, `arrayBufferToHex` are duplicated in both `services/ble.ts` (static methods) and `utils/parser.ts`. **Always import from `utils/parser`**, not from `ble.ts` static methods.
 
 ### Provisioning State Machine
 
@@ -84,6 +84,16 @@ The store has a 30-second timeout on `sendWiFiConfig()` — if no `config_result
 2. **config** — WiFi SSID/password input. Sends config via BLE write. Redirects to index if no device selected.
 3. **debug** — Real-time log viewer with level filtering. Shows provisioning status and config results.
 4. **tutorial** — Expandable FAQ + protocol docs. Reference only (no store usage).
+
+**Important**: Pages MUST be class components (not functional components). No hooks allowed.
+
+Each page lives in `src/pages/<name>/` with this structure:
+```
+src/pages/<name>/
+├── index.tsx        # Class component
+├── index.css        # Supplementary CSS (must import)
+└── index.config.ts  # Page config (navigationBarTitleText)
+```
 
 ## Build Configuration
 
@@ -102,3 +112,10 @@ The store has a 30-second timeout on `sendWiFiConfig()` — if no `config_result
 - Build output goes to `dist/` (referenced in `project.config.json` as mini program root)
 - App ID: `wxdae9ce011aac5fb1` (WeChat), also `project.tt.json` for TikTok mini program
 - `noImplicitAny: false` — lenient typing is intentional
+- Conditional classes: use template literals `` className={`${condition ? 'class-a' : 'class-b'}`} ``
+
+### Git Workflow
+
+- Pull before work: Always `git pull` at session start
+- Commit frequently: After each logical unit (bug fix, feature, refactor)
+- Keep commits atomic: One concern per commit

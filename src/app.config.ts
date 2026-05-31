@@ -1,6 +1,7 @@
 export default defineAppConfig({
   pages: [
     'pages/index/index',
+    'pages/dashboard/index',
     'pages/config/index',
     'pages/debug/index',
     'pages/tutorial/index',
@@ -18,6 +19,12 @@ export default defineAppConfig({
         selectedIconPath: 'assets/tab-device-active.png',
       },
       {
+        pagePath: 'pages/dashboard/index',
+        text: '控制台',
+        iconPath: 'assets/tab-debug.png',
+        selectedIconPath: 'assets/tab-debug-active.png',
+      },
+      {
         pagePath: 'pages/config/index',
         text: '配网',
         iconPath: 'assets/tab-config.png',
@@ -25,7 +32,7 @@ export default defineAppConfig({
       },
       {
         pagePath: 'pages/debug/index',
-        text: '调试',
+        text: '日志',
         iconPath: 'assets/tab-debug.png',
         selectedIconPath: 'assets/tab-debug-active.png',
       },
