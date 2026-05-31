@@ -7,6 +7,8 @@ export const BLE_CHAR_READ_UUID = '0000fff3-0000-1000-8000-00805f9b34fb'
 
 const CONNECT_TIMEOUT_MS = 10000
 const MTU_SIZE = 512
+const RECONNECT_DELAY_MS = 2000
+const MAX_RECONNECT_ATTEMPTS = 3
 
 export interface BLEDevice {
   deviceId: string
@@ -29,6 +31,9 @@ class BLEService {
   private isConnected: boolean = false
   private listeners: Map<string, BLEEventCallback[]> = new Map()
   private connectTimer: ReturnType<typeof setTimeout> | null = null
+  private reconnectAttempts: number = 0
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private shouldReconnect: boolean = false
 
   on(event: string, callback: BLEEventCallback) {
     if (!this.listeners.has(event)) {
@@ -133,6 +138,8 @@ class BLEService {
       }
 
       this.isConnected = true
+      this.shouldReconnect = true
+      this.reconnectAttempts = 0
       this.emit('connectionStateChange', { state: 'connected', deviceId })
 
       // Listen for connection state changes
@@ -142,6 +149,23 @@ class BLEService {
           state: res.connected ? 'connected' : 'disconnected',
           deviceId: res.deviceId,
         })
+
+        // Auto-reconnect on unexpected disconnect
+        if (!res.connected && this.shouldReconnect && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          this.reconnectAttempts++
+          this.emit('error', {
+            code: 0,
+            message: `连接断开，正在重试 (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`
+          })
+          this.reconnectTimer = setTimeout(() => {
+            this.connect(res.deviceId).catch(() => {
+              // Reconnect failed, will retry if attempts remain
+            })
+          }, RECONNECT_DELAY_MS)
+        } else if (!res.connected) {
+          this.shouldReconnect = false
+          this.reconnectAttempts = 0
+        }
       })
 
       // Negotiate MTU for larger payloads
@@ -163,6 +187,13 @@ class BLEService {
 
   async disconnect(): Promise<void> {
     if (!this.deviceId) return
+
+    this.shouldReconnect = false
+    this.reconnectAttempts = 0
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
 
     this.emit('connectionStateChange', { state: 'disconnecting', deviceId: this.deviceId })
 
