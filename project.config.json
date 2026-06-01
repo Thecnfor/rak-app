@@ -2,7 +2,7 @@
   "miniprogramRoot": "./dist",
   "projectname": "Raro",
   "description": "xrak · Raro",
-  "appid": "touristappid",
+  "appid": "wxdae9ce011aac5fb1",
   "setting": {
     "urlCheck": false,
     "es6": true,
@@ -11,5 +11,6 @@
     "postcss": false,
     "minified": false
   },
-  "compileType": "miniprogram"
+  "compileType": "miniprogram",
+  "lazyCodeLoading": "requiredComponents"
 }
