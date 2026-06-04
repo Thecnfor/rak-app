@@ -1,9 +1,8 @@
 export default defineAppConfig({
   pages: [
-    'pages/index/index',
-    'pages/config/index',
+    'pages/dashboard/index',
+    'pages/provision/index',
     'pages/debug/index',
-    'pages/tutorial/index',
   ],
   tabBar: {
     color: '#BBBBBB',
@@ -12,13 +11,13 @@ export default defineAppConfig({
     borderStyle: 'white',
     list: [
       {
-        pagePath: 'pages/index/index',
-        text: '设备',
+        pagePath: 'pages/dashboard/index',
+        text: '控制',
         iconPath: 'assets/tab-device.png',
         selectedIconPath: 'assets/tab-device-active.png',
       },
       {
-        pagePath: 'pages/config/index',
+        pagePath: 'pages/provision/index',
         text: '配网',
         iconPath: 'assets/tab-config.png',
         selectedIconPath: 'assets/tab-config-active.png',
@@ -28,12 +27,6 @@ export default defineAppConfig({
         text: '调试',
         iconPath: 'assets/tab-debug.png',
         selectedIconPath: 'assets/tab-debug-active.png',
-      },
-      {
-        pagePath: 'pages/tutorial/index',
-        text: '教程',
-        iconPath: 'assets/tab-tutorial.png',
-        selectedIconPath: 'assets/tab-tutorial-active.png',
       },
     ],
   },
