@@ -1,3 +1,3 @@
 export default definePageConfig({
-  navigationBarTitleText: '控制台'
+  navigationBarTitleText: '控制中心',
 })

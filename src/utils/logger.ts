@@ -41,20 +41,20 @@ class Logger {
     return entry
   }
 
-  info(message: string, data?: any) {
-    return this.addLog('INFO', message, data)
+  info(message: string, data?: any, direction?: 'TX' | 'RX') {
+    return this.addLog('INFO', message, data, direction)
   }
 
-  debug(message: string, data?: any) {
-    return this.addLog('DEBUG', message, data)
+  debug(message: string, data?: any, direction?: 'TX' | 'RX') {
+    return this.addLog('DEBUG', message, data, direction)
   }
 
-  warn(message: string, data?: any) {
-    return this.addLog('WARN', message, data)
+  warn(message: string, data?: any, direction?: 'TX' | 'RX') {
+    return this.addLog('WARN', message, data, direction)
   }
 
-  error(message: string, data?: any) {
-    return this.addLog('ERROR', message, data)
+  error(message: string, data?: any, direction?: 'TX' | 'RX') {
+    return this.addLog('ERROR', message, data, direction)
   }
 
   tx(message: string, data?: any) {

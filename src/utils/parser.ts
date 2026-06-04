@@ -1,31 +1,28 @@
-export interface WiFiConfig {
-  ssid: string
-  password: string
-}
-
-export interface ConfigResult {
-  type: 'config_result'
-  status: 'success' | 'failed' | 'idle'
+export interface BLEMessage {
+  type: string
+  status?: string
   ip?: string
-  message: string
+  message?: string
 }
 
-export type BLEMessage = ConfigResult
-
+/**
+ * 编码 WiFi 配置为 BLE 传输的 ArrayBuffer
+ * 格式: JSON { ssid, password }
+ */
 export function encodeWiFiConfig(ssid: string, password: string): ArrayBuffer {
-  const config: WiFiConfig = { ssid, password }
-  const jsonStr = JSON.stringify(config)
-  return stringToArrayBuffer(jsonStr)
+  const payload = JSON.stringify({ ssid, password })
+  const encoder = new TextEncoder()
+  return encoder.encode(payload).buffer
 }
 
-export function decodeBLEMessage(buffer: ArrayBuffer): BLEMessage | null {
+/**
+ * 解码 BLE 接收的数据为消息对象
+ */
+export function decodeBLEMessage(data: ArrayBuffer): BLEMessage | null {
   try {
-    const jsonStr = arrayBufferToString(buffer)
-    const data = JSON.parse(jsonStr)
-    if (data && data.type === 'config_result') {
-      return data as ConfigResult
-    }
-    return null
+    const decoder = new TextDecoder()
+    const text = decoder.decode(new Uint8Array(data))
+    return JSON.parse(text) as BLEMessage
   } catch {
     return null
   }

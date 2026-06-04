@@ -82,3 +82,4 @@ class SimpleStore {
 }
 
 export const store = new SimpleStore()
+export default store

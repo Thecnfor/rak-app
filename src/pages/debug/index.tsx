@@ -8,12 +8,16 @@ import './index.css'
 interface DebugState {
   logs: LogEntry[]
   filterLevel: 'all' | 'INFO' | 'DEBUG' | 'WARN' | 'ERROR'
+  tutorialExpanded: boolean
+  expandedTutorialSection: number | null
 }
 
 class Debug extends Component<PropsWithChildren, DebugState> {
   state: DebugState = {
     logs: [],
     filterLevel: 'all',
+    tutorialExpanded: false,
+    expandedTutorialSection: null,
   }
 
   componentDidMount() {
@@ -52,7 +56,7 @@ class Debug extends Component<PropsWithChildren, DebugState> {
 
   handleResetProvisioning = () => {
     store.reset()
-    Taro.redirectTo({ url: '/pages/index/index' })
+    Taro.redirectTo({ url: '/pages/provision/index' })
   }
 
   getFilteredLogs(): LogEntry[] {
@@ -87,6 +91,61 @@ class Debug extends Component<PropsWithChildren, DebugState> {
     return ''
   }
 
+  toggleTutorial = () => {
+    this.setState({ tutorialExpanded: !this.state.tutorialExpanded })
+  }
+
+  toggleTutorialSection = (index: number) => {
+    this.setState({
+      expandedTutorialSection: this.state.expandedTutorialSection === index ? null : index,
+    })
+  }
+
+  getTutorialSections() {
+    return [
+      {
+        title: '准备工作',
+        content: [
+          '确保 ESP32-C3 开发板已烧录配网固件',
+          '确保手机蓝牙已开启',
+          '确保微信已获取蓝牙权限',
+          '准备好要连接的 WiFi 名称和密码',
+        ],
+      },
+      {
+        title: '配网流程',
+        content: [
+          '进入"配网"页面，点击"开始扫描"',
+          '等待扫描到 ESP32-C3 设备',
+          '点击设备进行连接',
+          '输入 WiFi 名称和密码',
+          '点击"发送配置"',
+          '等待设备返回配网结果',
+        ],
+      },
+      {
+        title: 'BLE 协议说明',
+        content: [
+          '服务 UUID: 0000fff0-0000-1000-8000-00805f9b34fb',
+          '',
+          'Write (fff1): 写入 WiFi 配置',
+          'Notify (fff2): 接收配网结果',
+          'Read (fff3): 读取设备状态',
+          '数据格式: JSON over BLE',
+        ],
+      },
+      {
+        title: '常见问题',
+        content: [
+          '扫描不到设备？确保 ESP32-C3 已上电且处于配网模式',
+          '连接失败？尝试靠近设备，确保距离在 5 米以内',
+          '配网失败？检查 WiFi 是否为 2.4GHz 频段',
+          '如何重新配网？点击上方"重新配网"按钮',
+        ],
+      },
+    ]
+  }
+
   getStatusText(state: string): string {
     switch (state) {
       case 'idle': return '空闲'
@@ -101,7 +160,7 @@ class Debug extends Component<PropsWithChildren, DebugState> {
   }
 
   render() {
-    const { filterLevel } = this.state
+    const { filterLevel, tutorialExpanded, expandedTutorialSection } = this.state
     const { provisioningState, configResult, selectedDevice, error } = store
     const filteredLogs = this.getFilteredLogs()
 
@@ -224,11 +283,77 @@ class Debug extends Component<PropsWithChildren, DebugState> {
           </View>
 
           {/* Legend */}
-          <View className="px-1">
+          <View className="px-1 mb-4">
             <Text className="text-[10px] text-[#BBB] leading-relaxed">
               · INFO  ○ DEBUG  ! WARN  × ERROR{'\n'}
               ↑ 发送  ↓ 接收
             </Text>
+          </View>
+
+          {/* ─── 使用教程（折叠） ─────────────────────────── */}
+          <View className="bg-white rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <View
+              className="p-4 flex justify-between items-center"
+              onClick={this.toggleTutorial}
+            >
+              <Text className="text-xs tracking-[0.15em] text-[#999] uppercase">使用教程</Text>
+              <Text className="text-[#CCC] text-xs">
+                {tutorialExpanded ? '−' : '+'}
+              </Text>
+            </View>
+
+            {tutorialExpanded && (
+              <View className="px-4 pb-4 border-t border-[#F5F3F0]">
+                {this.getTutorialSections().map((section, index) => (
+                  <View key={index} className="mt-3">
+                    <View
+                      className="flex justify-between items-center py-1"
+                      onClick={() => this.toggleTutorialSection(index)}
+                    >
+                      <View className="flex items-center gap-2">
+                        <Text className="text-[10px] text-[#CCC] font-mono w-4">
+                          {String(index + 1).padStart(2, '0')}
+                        </Text>
+                        <Text className="text-xs text-[#1A1A1A] font-medium">{section.title}</Text>
+                      </View>
+                      <Text className="text-[#CCC] text-[10px]">
+                        {expandedTutorialSection === index ? '−' : '+'}
+                      </Text>
+                    </View>
+
+                    {expandedTutorialSection === index && (
+                      <View className="ml-6 mt-1 mb-2">
+                        {section.content.map((line, lineIndex) => (
+                          <Text
+                            key={lineIndex}
+                            className={`text-[11px] leading-relaxed block ${
+                              line.startsWith('0000')
+                                ? 'text-[#999] font-mono text-[10px]'
+                                : line === ''
+                                ? 'h-2 block'
+                                : 'text-[#666]'
+                            }`}
+                          >
+                            {line || ' '}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))}
+
+                {/* BLE UUID 速查 */}
+                <View className="bg-[#1A1A1A] rounded-lg p-3 mt-3">
+                  <Text className="text-[9px] tracking-[0.15em] text-[#666] uppercase mb-2">BLE UUID 速查</Text>
+                  <Text className="text-[10px] text-[#999] font-mono leading-loose">
+                    Service · 0000fff0-...{'\n'}
+                    Write   · 0000fff1-...{'\n'}
+                    Notify  · 0000fff2-...{'\n'}
+                    Read    · 0000fff3-...
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </View>
