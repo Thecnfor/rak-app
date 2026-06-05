@@ -1,32 +1,32 @@
 # AGENTS.md
 
-Coding conventions and constraints for the Raro WeChat Mini Program.
+Raro 微信小程序的编码规范与约束。
 
-## Tech Stack
+## 技术栈
 
-- **Framework**: Taro 4.x + React 18 + TypeScript
-- **Styling**: Tailwind CSS 4 (`@tailwindcss/postcss` + `weapp-tailwindcss`)
-- **State**: Simple pub/sub store (`store/simple.ts`)
-- **Package manager**: pnpm
-- **Target**: WeChat Mini Program (`weapp`)
+- **框架**：Taro 4.x + React 18 + TypeScript
+- **样式**：Tailwind CSS 4（`@tailwindcss/postcss` + `weapp-tailwindcss`）
+- **状态管理**：简易 pub/sub store（`store/simple.ts`）+ MobX（`store/dashboard.ts`，仅控制中心使用）
+- **包管理**：pnpm
+- **目标平台**：微信小程序（`weapp`）
 
-## Component Pattern
+## 组件规范
 
-Pages MUST be class components:
+**页面必须使用 Class 组件**，禁止函数组件和 Hooks：
 
 ```typescript
 import { Component, PropsWithChildren } from 'react'
 import { View, Text } from '@tarojs/components'
 
 interface PageState {
-  // local state shape
+  // 本地状态定义
 }
 
 export default class PageName extends Component<PropsWithChildren, PageState> {
-  state: PageState = { /* initial */ }
+  state: PageState = { /* 初始值 */ }
 
-  componentDidMount() { /* setup */ }
-  componentWillUnmount() { /* cleanup */ }
+  componentDidMount() { /* 初始化 */ }
+  componentWillUnmount() { /* 清理 */ }
 
   render() {
     return <View>...</View>
@@ -34,69 +34,102 @@ export default class PageName extends Component<PropsWithChildren, PageState> {
 }
 ```
 
-No functional components or hooks. Each page defines a local `interface XxxState`.
+每个页面定义本地 `interface XxxState`。
 
-## State Management
+## 状态管理
 
-Import the simple store directly:
+### 简易 Store（主用）
 
 ```typescript
 import { store } from '../../store/simple'
 ```
 
-- Read: `store.selectedDevice`, `store.provisioningState`
-- Write: `store.setDevice(...)`, `store.setConnectionState(...)`
-- No `@inject`, `@observer`, or MobX decorators
+- 读取：`store.selectedDevice`、`store.provisioningState`
+- 写入：`store.setDevice(...)`、`store.setConnectionState(...)`
+- 纯 pub/sub 模式，无 MobX 装饰器
 
-## BLE Service
+### Dashboard Store（控制中心专用）
+
+```typescript
+import { dashboardStore } from '../../store/dashboard'
+```
+
+- 使用 MobX `@observable` / `@action` 装饰器
+- 管理：设备列表、WebSocket 状态、实时事件、调度器统计、自然语言指令
+- 仅 `pages/dashboard` 引用
+
+## 服务架构
+
+### BLE 服务
 
 ```typescript
 import { bleService } from '../../services/ble'
 
-// In componentDidMount
+// componentDidMount 中注册
 this.handleData = (data) => { /* ... */ }
 bleService.on('dataReceived', this.handleData)
 
-// In componentWillUnmount — ALWAYS cleanup
+// componentWillUnmount 中必须清理
 bleService.off('dataReceived', this.handleData)
 ```
 
-Events: `adapterStateChange`, `scanStateChange`, `deviceFound`, `connectionStateChange`, `dataSent`, `dataReceived`, `error`
+事件：`adapterStateChange`、`scanStateChange`、`deviceFound`、`connectionStateChange`、`dataSent`、`dataReceived`、`error`
 
-## Styling
+特性：自动重连（3 次，2 秒间隔）、连接超时（10 秒）、MTU 协商（512）
 
-Use Tailwind utility classes in `className`:
+### WebSocket 服务
+
+```typescript
+import { wsService } from '../../services/ws'
+```
+
+- 连接 go-kernel 实时事件流
+- 事件：`connected`、`disconnected`、`asr`、`voice_reply`、`action`、`chain_error`、`state`、`message`
+- 自动重连（3 秒间隔）
+
+### Kernel API 客户端
+
+```typescript
+import { getDevices, executeTask, executeAction, getSchedulerStats } from '../../services/kernel'
+```
+
+- HTTP 请求封装（Taro.request）
+- API：`getDevices`、`getDevice`、`executeTask`、`executeAction`、`routeNL`、`getSchedulerStats`、`getHealth`
+- 自动 trace_id 生成，遵循 RakMessage v0 协议
+
+## 样式规范
+
+使用 Tailwind 工具类：
 
 ```tsx
-<View className="min-h-screen bg-gray-50 p-4">
-  <Text className="text-lg font-bold text-gray-900">Title</Text>
+<View className="min-h-screen bg-[#FAF8F5] p-4">
+  <Text className="text-lg font-bold text-[#1A1A1A]">标题</Text>
 </View>
 ```
 
-For CSS that Tailwind cannot generate in WeChat (animations, pseudo-selectors), add to the page's `index.css`:
+Tailwind 无法覆盖的 CSS（动画、伪选择器）写在页面的 `index.css` 中：
 
 ```css
-/* pages/index/index.css */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 ```
 
-Each page MUST import its own `./index.css`.
+每个页面必须 `import './index.css'`。
 
-## File Structure
+## 文件结构
 
-Each page lives in `src/pages/<name>/`:
+每个页面在 `src/pages/<name>/` 下：
 
 ```
 src/pages/<name>/
-├── index.tsx        # Class component
-├── index.css        # Supplementary CSS
-└── index.config.ts  # Page config
+├── index.tsx        # Class 组件
+├── index.css        # 补充 CSS
+└── index.config.ts  # 页面配置（navigationBarTitleText）
 ```
 
-Page config:
+页面配置：
 
 ```typescript
 import { definePageConfig } from '@tarojs/taro'
@@ -106,38 +139,50 @@ export default definePageConfig({
 })
 ```
 
-## Imports
+## TabBar 页面
+
+| Tab | 页面路径 | 标题 | 功能 |
+|-----|---------|------|------|
+| 控制 | `pages/dashboard/index` | 控制中心 | 设备管理、快捷动作、NL 指令、实时事件、调度器监控 |
+| 配网 | `pages/provision/index` | 设备配网 | BLE 扫描 → WiFi 配置 → 结果 |
+| 日志 | `pages/debug/index` | 调试控制台 | 实时日志、状态监控、使用教程 |
+
+入口页 `pages/index/index`（设备扫描）不在 TabBar 中，仅作为启动页。
+
+## 导入规范
 
 ```typescript
-// Taro components
+// Taro 组件
 import { View, Text, Button, Input, ScrollView } from '@tarojs/components'
 
-// Taro APIs
+// Taro API
 import Taro from '@tarojs/taro'
 
-// Utilities — import from utils/parser, NOT from ble.ts static methods
+// 工具函数 — 从 utils/parser 导入，不要从 ble.ts 静态方法导入
 import { encodeWiFiConfig, decodeBLEMessage, arrayBufferToHex } from '../../utils/parser'
 
-// Logger
+// 日志
 import { logger } from '../../utils/logger'
 ```
 
-## TypeScript
+## TypeScript 配置
 
-- `strictNullChecks: true` — handle null checks
-- `noImplicitAny: false` — `any` is acceptable when needed
-- `noUnusedLocals: true`, `noUnusedParameters: true`
-- `jsx: "react-jsx"` — no need for `import React`
+- `strictNullChecks: true` — 必须处理空值
+- `noImplicitAny: false` — 允许 `any`
+- `noUnusedLocals: true`、`noUnusedParameters: true`
+- `jsx: "react-jsx"` — 无需 `import React`
+- `experimentalDecorators: true` — MobX 装饰器支持
 
-## Conventions
+## 编码约定
 
-- 2-space indentation
-- Singletons: all services/stores are singletons, do not create new instances
-- Conditional classes: use template literals `` className={`${condition ? 'class-a' : 'class-b'}`} ``
+- 2 空格缩进
+- 所有服务/Store 都是单例，不要创建新实例
+- 条件类名：`` className={`${condition ? 'class-a' : 'class-b'}`} ``
+- 配色方案：主色 `#1A1A1A`、背景 `#FAF8F5`、边框 `#E5E2DD`、成功 `#2D7D46`、错误 `#C0392B`
 
-## Git Workflow
+## Git 工作流
 
-- **Pull before work**: Always `git pull` at the start of a session to ensure you have the latest changes
-- **Commit frequently**: Commit after each logical unit of work (bug fix, feature, refactor) — do not accumulate large changes
-- **Keep commits atomic**: One concern per commit. Separate "fix BLE listener leak" from "remove duplicated utilities"
-- **Commit message style**: Use concise Chinese or English descriptions of what changed and why
+- **先 pull**：每次会话开始先 `git pull`
+- **频繁提交**：每个逻辑单元（bug 修复、功能、重构）完成后立即提交
+- **原子提交**：一个提交只关注一件事
+- **提交信息**：使用中文，格式 `<type>: <描述>`（feat/fix/docs/refactor）

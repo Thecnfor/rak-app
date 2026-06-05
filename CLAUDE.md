@@ -1,121 +1,176 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 AI 助手在本仓库中工作时提供指导。
 
-## Project Overview
+## 项目概述
 
-**Raro** — a WeChat Mini Program for provisioning ESP32-C3 devices with WiFi credentials over BLE. Built on Taro 4.x + React 18 + TypeScript + Tailwind CSS 4. Documentation and comments are primarily in Chinese (中文).
+**Raro** — 微信小程序，用于 ESP32-C3 设备的 BLE 配网、语音控制与实时监控。基于 Taro 4.x + React 18 + TypeScript + Tailwind CSS 4 开发。文档和注释均为中文。
 
-This is a sub-project of the RakTec/Xra AIoT platform. The companion firmware lives in `rak-esp/` (not in this repo). The global BLE/MQTT protocol spec is in a separate `RakTec/` repo.
+这是 RakTec / Xra AIoT 平台的子项目。配套固件在 `rak-esp/` 仓库中，中央后端为 `go-kernel`。
 
-## Commands
+## 常用命令
 
 ```bash
-pnpm install              # Install dependencies
-pnpm dev:weapp            # Dev server for WeChat Mini Program (open dist/ in WeChat DevTools)
-pnpm build:weapp          # Production build
+pnpm install              # 安装依赖
+pnpm dev:weapp            # 微信小程序开发服务器（用微信开发者工具打开 dist/）
+pnpm build:weapp          # 生产构建
 ```
 
-Other platform targets exist (`dev:h5`, `dev:alipay`, `dev:tt`, etc.) but WeChat (`weapp`) is the primary target. No `lint` script is defined — ESLint runs via `eslint-config-taro` during build.
+其他平台目标存在（`dev:h5`、`dev:alipay`、`dev:tt` 等），但微信（`weapp`）是主要目标。无 `lint` 脚本 — ESLint 通过 `eslint-config-taro` 在构建时运行。
 
-### Python BLE Tests
+### Python BLE 测试
 
 ```bash
 cd test
-python -m unittest test_provisioning.py   # Run BLE protocol tests
+python -m unittest test_provisioning.py   # BLE 协议测试
 ```
 
-Requires Python 3.11+ and `bleak>=0.21.0`.
+需要 Python 3.11+ 和 `bleak>=0.21.0`。
 
-## Architecture
+## 架构
 
-### Data Flow
+### 数据流
 
 ```
-BLE Service (services/ble.ts)
-    ↕ event emitter (on/off/emit)
-Simple Store (store/simple.ts)  ← pub/sub state management
-    ↕ subscribe/notify pattern
-4 Pages (pages/index, config, debug, tutorial)
-    ↕
-Parser (utils/parser.ts) + Logger (utils/logger.ts)
+go-kernel (:8080)
+    ↓ HTTP API                ↓ WebSocket 实时事件
+Kernel 客户端              WSService
+(services/kernel.ts)      (services/ws.ts)
+    ↓                          ↓
+Dashboard Store ──────→ 控制中心页面
+(store/dashboard.ts)    (pages/dashboard)
+    ↑
+Simple Store ─────────→ 配网 / 调试页面
+(store/simple.ts)      (pages/provision, debug)
+    ↑
+BLE Service ←────────→ ESP32-C3 设备
+(services/ble.ts)
+    ↑
+Parser + Logger
+(utils/parser.ts, utils/logger.ts)
 ```
 
-### State Management
+### 状态管理
 
-**Two stores exist, but only one is actively used:**
+**三个 Store 并存，各司其职：**
 
-- `store/simple.ts` — Plain pub/sub store (no MobX). This is the store imported by all pages. Uses `subscribe()`/`notify()` pattern. Replaced MobX to avoid WeChat Mini Program compatibility issues.
-- `store/provisioning.ts` — MobX 4.x store with `@observable`/`@action` decorators. Contains BLE listener integration but is **not currently imported by any page**. Kept as reference for future migration.
+- `store/simple.ts` — 简易 pub/sub Store（无 MobX）。配网和调试页面使用。`subscribe()`/`notify()` 模式。管理：BLE 设备、连接状态、配网状态、WiFi 配置、错误信息。
+- `store/dashboard.ts` — MobX Store（`@observable`/`@action`）。控制中心页面使用。管理：设备列表、WebSocket 状态、实时事件流、PA-HPS 调度器统计、自然语言指令执行。
+- `store/provisioning.ts` — MobX 配网 Store（**遗留，当前无页面引用**）。保留供未来参考。
 
-Pages do **not** use `@inject` or `@observer` decorators — they import `simpleStore` directly.
+页面不使用 `@inject` 或 `@observer` 装饰器 — 直接导入 Store 实例。
 
-### Key Singletons
+### 核心单例
 
-All core services are **singletons** exported from their modules:
+- `bleService`（`services/ble.ts`）— 封装 Taro BLE API，自定义事件发射器（`Map<string, callback[]>`）。事件：`adapterStateChange`、`scanStateChange`、`deviceFound`、`connectionStateChange`、`dataSent`、`dataReceived`、`error`。特性：自动重连（3 次，2 秒间隔）、连接超时（10 秒）、MTU 协商（512）。
+- `wsService`（`services/ws.ts`）— go-kernel WebSocket 实时事件服务。事件：`connected`、`disconnected`、`asr`、`voice_reply`、`action`、`chain_error`、`state`、`message`。自动重连（3 秒间隔）。
+- `dashboardStore`（`store/dashboard.ts`）— 控制中心 MobX 状态。
+- `store`（`store/simple.ts`）— 配网/调试 pub/sub 状态。
+- `logger`（`utils/logger.ts`）— 内存日志缓冲，pub/sub 监听器。
 
-- `bleService` (`services/ble.ts`) — wraps Taro BLE APIs with custom event emitter (`Map<string, callback[]>`). Events: `adapterStateChange`, `scanStateChange`, `deviceFound`, `connectionStateChange`, `dataSent`, `dataReceived`, `error`
-- `simpleStore` (`store/simple.ts`) — global state with pub/sub notifications
-- `logger` (`utils/logger.ts`) — in-memory log buffer with pub/sub listeners
+### Kernel API（`services/kernel.ts`）
 
-### BLE Protocol
+HTTP 客户端封装，连接 go-kernel 后端：
 
-Single service UUID `0000fff0-0000-1000-8000-00805f9b34fb` with three characteristics:
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `getDevices()` | `GET /api/v1/devices` | 获取所有设备列表 |
+| `getDevice(id)` | `GET /api/v1/device/:id` | 获取单个设备 |
+| `executeTask(input)` | `POST /api/v1/task/execute` | 自然语言任务执行（完整管线） |
+| `executeAction(id, action)` | `POST /api/v1/action/execute` | 单动作直接执行 |
+| `routeNL(input)` | `POST /api/v1/route` | 认知路由（NL → 任务描述） |
+| `getSchedulerStats()` | `GET /api/debug/scheduler` | PA-HPS 调度器统计 |
+| `getHealth()` | `GET /api/health` | 健康检查 |
 
-| Characteristic | UUID (last segment) | Purpose |
-|---|---|---|
-| Write | `fff1` | Send WiFi config to device |
-| Notify | `fff2` | Receive config results from device |
-| Read | `fff3` | Read device status |
+请求自动附加 trace_id，遵循 RakMessage v0 协议。
 
-Data format: JSON strings encoded as ArrayBuffer (see `utils/parser.ts`). Message types are discriminated by a `type` field: `wifi_config`, `config_result`, `device_status`.
+### BLE 协议
 
-Note: `arrayBufferToString`, `stringToArrayBuffer`, `arrayBufferToHex` are duplicated in both `services/ble.ts` (static methods) and `utils/parser.ts`. **Always import from `utils/parser`**, not from `ble.ts` static methods.
+单一 Service UUID `0000fff0-0000-1000-8000-00805f9b34fb`，三个特征值：
 
-### Provisioning State Machine
+| 特征值 | UUID（末段） | 用途 |
+|--------|-------------|------|
+| Write | `fff1` | 发送 WiFi 配置 |
+| Notify | `fff2` | 接收配网结果 |
+| Read | `fff3` | 读取设备状态 |
 
-`provisioningState` transitions: `idle` → `scanning` → `connecting` → `connected` → `configuring` → `success` | `failed`
+数据格式：JSON 字符串编码为 ArrayBuffer（见 `utils/parser.ts`）。消息类型通过 `type` 字段区分：`wifi_config`、`config_result`、`device_status`。
 
-The store has a 30-second timeout on `sendWiFiConfig()` — if no `config_result` arrives, it transitions to `failed`.
+注意：`arrayBufferToString`、`stringToArrayBuffer`、`arrayBufferToHex` 在 `services/ble.ts` 和 `utils/parser.ts` 中有重复。**始终从 `utils/parser` 导入**。
 
-### Pages (Tab Bar)
+### 配网状态机
 
-1. **index** — BLE device scan + list. Connects to device, then navigates to config.
-2. **config** — WiFi SSID/password input. Sends config via BLE write. Redirects to index if no device selected.
-3. **debug** — Real-time log viewer with level filtering. Shows provisioning status and config results.
-4. **tutorial** — Expandable FAQ + protocol docs. Reference only (no store usage).
+`provisioningState` 转换：`idle` → `configuring` → `success` | `failed`
 
-**Important**: Pages MUST be class components (not functional components). No hooks allowed.
+Store 有 30 秒超时 — 若未收到 `config_result`，转为 `failed`。
 
-Each page lives in `src/pages/<name>/` with this structure:
+### 页面说明
+
+| 页面 | TabBar | 标题 | 功能 |
+|------|--------|------|------|
+| `pages/index` | 否 | 设备扫描 | BLE 设备扫描与连接（入口页） |
+| `pages/dashboard` | 控制 | 控制中心 | 设备管理、快捷动作、NL 指令、实时事件流、PA-HPS 调度器监控 |
+| `pages/provision` | 配网 | 设备配网 | 统一三步配网流程（扫描 → 配置 → 结果） |
+| `pages/debug` | 日志 | 调试控制台 | 实时日志查看、配网状态、使用教程 |
+
+**重要**：页面必须使用 Class 组件（非函数组件）。禁止 Hooks。
+
+每个页面在 `src/pages/<name>/` 下：
 ```
 src/pages/<name>/
-├── index.tsx        # Class component
-├── index.css        # Supplementary CSS (must import)
-└── index.config.ts  # Page config (navigationBarTitleText)
+├── index.tsx        # Class 组件
+├── index.css        # 补充 CSS（必须导入）
+└── index.config.ts  # 页面配置（navigationBarTitleText）
 ```
 
-## Build Configuration
+### 快捷动作列表
 
-- Design width: 750 (Taro default)
-- Webpack persistent cache: disabled
-- Production builds: ESBuild drops `console`/`debugger`, Terser as fallback
-- `lazyCodeLoading: 'requiredComponents'` enabled in production
-- `weapp-tailwindcss` transforms Tailwind classes with `rem2rpx: true`
+控制中心支持以下快捷动作（通过 go-kernel → MQTT → ESP32 执行）：
 
-## Conventions
+| 动作 | 标签 | 图标 |
+|------|------|------|
+| `wave_hand` | 招手 | 👋 |
+| `shake_head` | 摇头 | 🙅 |
+| `nod` | 点头 | 🙆 |
+| `dance` | 跳舞 | 💃 |
+| `lock_open` | 开门 | 🔓 |
+| `lock_close` | 关门 | 🔒 |
+| `move_forward` | 前进 | ⬆️ |
+| `move_back` | 后退 | ⬇️ |
+| `emergency_stop` | 急停 | 🛑 |
 
-- 2-space indentation (`.editorconfig`)
-- `experimentalDecorators: true` in tsconfig — required for MobX decorators (used in `store/provisioning.ts`)
-- `strictNullChecks: true`, `noUnusedLocals: true`, `noUnusedParameters: true`
-- ESLint extends `taro/react`; React 17+ JSX transform (no need for `import React`)
-- Build output goes to `dist/` (referenced in `project.config.json` as mini program root)
-- App ID: `wxdae9ce011aac5fb1` (WeChat), also `project.tt.json` for TikTok mini program
-- `noImplicitAny: false` — lenient typing is intentional
-- Conditional classes: use template literals `` className={`${condition ? 'class-a' : 'class-b'}`} ``
+### 实时事件流
 
-### Git Workflow
+WebSocket 推送的链路事件类型：
 
-- Pull before work: Always `git pull` at session start
-- Commit frequently: After each logical unit (bug fix, feature, refactor)
-- Keep commits atomic: One concern per commit
+- `asr` — ASR 语音识别结果（`text`）
+- `voice_reply` — 语音回复（`voiceReply`、`latency`）
+- `action` — 动作执行结果（`actions[]`、`priority`、`targetDevice`）
+- `error` — 链路错误（`error`）
+
+## 构建配置
+
+- 设计宽度：750（Taro 默认）
+- Webpack 持久化缓存：已禁用
+- 生产构建：ESBuild 移除 `console`/`debugger`，Terser 作为后备
+- `lazyCodeLoading: 'requiredComponents'` 生产环境启用
+- `weapp-tailwindcss` 转换 Tailwind 类名，`rem2rpx: true`
+
+## 编码约定
+
+- 2 空格缩进（`.editorconfig`）
+- `experimentalDecorators: true`（tsconfig）— MobX 装饰器所需
+- `strictNullChecks: true`、`noUnusedLocals: true`、`noUnusedParameters: true`
+- `noImplicitAny: false` — 宽松类型是有意为之
+- ESLint 继承 `taro/react`；React 17+ JSX 转换（无需 `import React`）
+- 构建输出到 `dist/`（`project.config.json` 中的 `miniprogramRoot`）
+- App ID：`wxdae9ce011aac5fb1`（微信），另有 `project.tt.json`（抖音小程序）
+- 条件类名：`` className={`${condition ? 'class-a' : 'class-b'}`} ``
+- 配色方案：主色 `#1A1A1A`、背景 `#FAF8F5`、边框 `#E5E2DD`、成功 `#2D7D46`、错误 `#C0392B`
+
+### Git 工作流
+
+- 先 pull：每次会话开始先 `git pull`
+- 频繁提交：每个逻辑单元完成后立即提交
+- 原子提交：一个提交只关注一件事
+- 提交信息：中文，格式 `<type>: <描述>`（feat/fix/docs/refactor）
