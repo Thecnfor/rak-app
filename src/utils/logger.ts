@@ -5,11 +5,13 @@ export interface LogEntry {
   timestamp: number
   level: LogLevel
   message: string
-  data?: any
+  data?: unknown
   direction?: 'TX' | 'RX'
 }
 
 type LogListener = (entry: LogEntry) => void
+
+const MAX_LOGS = 500
 
 class Logger {
   private logs: LogEntry[] = []
@@ -27,7 +29,7 @@ class Logger {
     }
   }
 
-  private addLog(level: LogLevel, message: string, data?: any, direction?: 'TX' | 'RX') {
+  private addLog(level: LogLevel, message: string, data?: unknown, direction?: 'TX' | 'RX') {
     const entry: LogEntry = {
       id: `log_${++this.idCounter}`,
       timestamp: Date.now(),
@@ -37,31 +39,35 @@ class Logger {
       direction,
     }
     this.logs.push(entry)
+    // 超出上限时丢弃最旧的日志
+    if (this.logs.length > MAX_LOGS) {
+      this.logs.splice(0, this.logs.length - MAX_LOGS)
+    }
     this.listeners.forEach(listener => listener(entry))
     return entry
   }
 
-  info(message: string, data?: any, direction?: 'TX' | 'RX') {
+  info(message: string, data?: unknown, direction?: 'TX' | 'RX') {
     return this.addLog('INFO', message, data, direction)
   }
 
-  debug(message: string, data?: any, direction?: 'TX' | 'RX') {
+  debug(message: string, data?: unknown, direction?: 'TX' | 'RX') {
     return this.addLog('DEBUG', message, data, direction)
   }
 
-  warn(message: string, data?: any, direction?: 'TX' | 'RX') {
+  warn(message: string, data?: unknown, direction?: 'TX' | 'RX') {
     return this.addLog('WARN', message, data, direction)
   }
 
-  error(message: string, data?: any, direction?: 'TX' | 'RX') {
+  error(message: string, data?: unknown, direction?: 'TX' | 'RX') {
     return this.addLog('ERROR', message, data, direction)
   }
 
-  tx(message: string, data?: any) {
+  tx(message: string, data?: unknown) {
     return this.addLog('DEBUG', message, data, 'TX')
   }
 
-  rx(message: string, data?: any) {
+  rx(message: string, data?: unknown) {
     return this.addLog('DEBUG', message, data, 'RX')
   }
 

@@ -2,11 +2,9 @@
  * 简单的全局状态管理，替代 MobX（避免微信小程序兼容性问题）
  */
 
-export interface BLEDevice {
-  deviceId: string
-  name: string
-  RSSI: number
-}
+import type { BLEDevice, BLEConnectionState } from '../types/ble'
+
+export { BLEDevice }
 
 export interface ConfigResult {
   type: 'config_result'
@@ -19,7 +17,7 @@ type Listener = () => void
 
 class SimpleStore {
   selectedDevice: BLEDevice | null = null
-  connectionState: 'disconnected' | 'connecting' | 'connected' = 'disconnected'
+  connectionState: BLEConnectionState = 'disconnected'
   provisioningState: 'idle' | 'configuring' | 'success' | 'failed' = 'idle'
   configResult: ConfigResult | null = null
   error: string | null = null

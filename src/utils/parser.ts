@@ -8,11 +8,27 @@ export interface BLEMessage {
 /**
  * 编码 WiFi 配置为 BLE 传输的 ArrayBuffer
  * 格式: JSON { ssid, password }
+ *
+ * IEEE 802.11 限制: SSID ≤ 32 字节, 密码 ≤ 63 字节
  */
 export function encodeWiFiConfig(ssid: string, password: string): ArrayBuffer {
+  if (!ssid || ssid.trim().length === 0) {
+    throw new Error('WiFi 名称不能为空')
+  }
+  if (!password || password.length < 8) {
+    throw new Error('WiFi 密码至少 8 位')
+  }
+  const ssidBytes = new TextEncoder().encode(ssid).byteLength
+  if (ssidBytes > 32) {
+    throw new Error(`WiFi 名称过长 (${ssidBytes} > 32 字节)`)
+  }
+  if (password.length > 63) {
+    throw new Error(`WiFi 密码过长 (${password.length} > 63 字符)`)
+  }
   const payload = JSON.stringify({ ssid, password })
-  const encoder = new TextEncoder()
-  return encoder.encode(payload).buffer
+  const encoded = new TextEncoder().encode(payload)
+  // 安全截取：避免底层 ArrayBuffer 大于实际数据
+  return encoded.buffer.slice(0, encoded.byteLength)
 }
 
 /**

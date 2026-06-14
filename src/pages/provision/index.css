@@ -1,13 +1,32 @@
-/* 扫描动画点 */
-.scanning-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #1A1A1A;
-  animation: pulse 1.5s ease-in-out infinite;
+/* ─── 配网页面样式 ──────────────────────────────────────── */
+
+/* 卡片 hover 效果 */
+.r-card-hover {
+  border-color: var(--r-text) !important;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.3; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.2); }
+/* 发送中按钮 */
+.r-btn-sending {
+  background: var(--r-border) !important;
+  color: var(--r-text-muted) !important;
+}
+
+/* 结果图标 */
+.r-result-icon {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.r-result-success {
+  background: rgba(45, 125, 70, 0.1);
+  color: var(--r-success);
+}
+
+.r-result-failed {
+  background: rgba(192, 57, 43, 0.1);
+  color: var(--r-error);
 }

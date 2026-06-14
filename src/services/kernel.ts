@@ -1,7 +1,5 @@
 import Taro from '@tarojs/taro'
-
-// go-kernel 服务地址（Hak 服务器）
-const KERNEL_BASE = 'http://116.205.183.125:8080'
+import { KERNEL_BASE } from '../config/env'
 
 // ─── 类型定义 ───────────────────────────────────────────────
 
@@ -83,7 +81,7 @@ function generateTraceId(): string {
   return 'rak-app-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
 }
 
-async function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, data?: any): Promise<T> {
+async function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, data?: unknown): Promise<T> {
   try {
     const res = await Taro.request({
       url: `${KERNEL_BASE}${path}`,

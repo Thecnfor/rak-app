@@ -1,8 +1,96 @@
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+/* ─── 控制中心页面样式 ──────────────────────────────────── */
+
+/* 设备卡片 */
+.r-device-card {
+  display: inline-block;
+  vertical-align: top;
 }
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+/* 快捷动作网格 */
+.r-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.r-action-item {
+  background: var(--r-card);
+  border: 1px solid var(--r-border);
+  border-radius: var(--r-radius);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.r-action-hover {
+  border-color: var(--r-text) !important;
+  background: var(--r-bg) !important;
+}
+
+/* 发送按钮 */
+.r-btn-send {
+  background: var(--r-text);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  padding: 0 32px;
+  font-size: 24px;
+  font-weight: 500;
+  min-height: 72px;
+  line-height: 72px;
+}
+
+.r-btn-send-disabled {
+  background: var(--r-border);
+  color: var(--r-text-muted);
+}
+
+/* 结果面板 */
+.r-result-panel {
+  background: var(--r-bg);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+/* 事件流 */
+.r-event-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--r-border-light);
+}
+
+.r-event-item:last-child {
+  border-bottom: none;
+}
+
+/* 调度器队列卡片 */
+.r-queue-card {
+  flex: 1;
+  background: var(--r-bg);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.r-queue-q0 {
+  border-left: 4px solid var(--r-error);
+}
+
+.r-queue-q1 {
+  border-left: 4px solid var(--r-warning);
+}
+
+.r-queue-q2 {
+  border-left: 4px solid var(--r-text-faint);
+}
+
+/* 统计行 */
+.r-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }

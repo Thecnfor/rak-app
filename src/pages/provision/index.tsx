@@ -10,6 +10,12 @@ import './index.css'
 
 type Step = 'scan' | 'config' | 'result'
 
+interface WifiItem {
+  SSID: string
+  signalStrength: number
+  secure: boolean
+}
+
 interface ProvisionState {
   step: Step
   devices: BLEDevice[]
@@ -20,9 +26,11 @@ interface ProvisionState {
   showPassword: boolean
   sending: boolean
   scanError: string | null
+  wifiList: WifiItem[]
+  showWifiList: boolean
 }
 
-// ─── 统一配网页 ───────────────────────────────────────────
+// ─── 配网页面 ──────────────────────────────────────────────
 
 class Provision extends Component<PropsWithChildren, ProvisionState> {
   private configTimeout: ReturnType<typeof setTimeout> | null = null
@@ -37,6 +45,8 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
     showPassword: false,
     sending: false,
     scanError: null,
+    wifiList: [],
+    showWifiList: false,
   }
 
   componentDidMount() {
@@ -95,6 +105,33 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
       this.setState({ scanError: e.message || '停止扫描失败' })
     }
     this.setState({ isScanning: false })
+  }
+
+  // ─── WiFi 扫描 ──────────────────────────────────────────
+
+  handleScanWifi = async () => {
+    try {
+      await Taro.startWifi()
+      const res = await Taro.getWifiList({})
+      // Taro.getWifiList 在小程序中通过回调获取，这里尝试直接获取
+      this.setState({ showWifiList: true })
+    } catch (error: any) {
+      // WiFi 扫描需要位置权限
+      Taro.showModal({
+        title: '需要位置权限',
+        content: '获取 WiFi 列表需要位置权限，请在设置中开启',
+        confirmText: '去设置',
+        success: (res) => {
+          if (res.confirm) {
+            Taro.openSetting()
+          }
+        },
+      })
+    }
+  }
+
+  handleSelectWifi = (ssid: string) => {
+    this.setState({ ssid, showWifiList: false })
   }
 
   // ─── 设备选择 ───────────────────────────────────────────
@@ -210,27 +247,25 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
   renderStepIndicator() {
     const { step } = this.state
     const steps = [
-      { key: 'scan', label: '扫描设备', num: '①' },
-      { key: 'config', label: 'WiFi 配置', num: '②' },
-      { key: 'result', label: '配网结果', num: '③' },
+      { key: 'scan', label: '扫描', num: '1' },
+      { key: 'config', label: '配置', num: '2' },
+      { key: 'result', label: '完成', num: '3' },
     ]
 
     return (
-      <View className="flex items-center justify-between mb-5 px-1">
+      <View className="flex items-center mb-8">
         {steps.map((s, i) => {
           const isActive = s.key === step
-          const isPast = (step === 'config' && s.key === 'scan') || (step === 'result' && i < 2)
+          const isDone = (step === 'config' && s.key === 'scan') || (step === 'result' && i < 2)
           return (
-            <View key={s.key} className="flex items-center">
-              <View className={`flex items-center gap-1.5 ${isActive ? 'opacity-100' : isPast ? 'opacity-60' : 'opacity-30'}`}>
-                <Text className={`text-xs font-medium ${isActive ? 'text-[#1A1A1A]' : 'text-[#999]'}`}>
-                  {s.num}
-                </Text>
-                <Text className={`text-xs ${isActive ? 'text-[#1A1A1A] font-medium' : 'text-[#999]'}`}>
-                  {s.label}
-                </Text>
+            <View key={s.key} className="flex items-center flex-1">
+              <View className={`r-step-dot ${isActive ? 'r-step-active' : isDone ? 'r-step-done' : 'r-step-pending'}`}>
+                <Text>{isDone ? '✓' : s.num}</Text>
               </View>
-              {i < 2 && <Text className="text-[#E5E2DD] mx-2">→</Text>}
+              <Text className={`ml-2 text-xs ${isActive ? 'text-[var(--r-text)] font-medium' : 'text-[var(--r-text-muted)]'}`}>
+                {s.label}
+              </Text>
+              {i < 2 && <View className={`r-step-line ${isDone ? 'r-step-line-done' : ''}`} />}
             </View>
           )
         })}
@@ -246,19 +281,13 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
     return (
       <View>
         {/* 扫描按钮 */}
-        <View className="mb-5">
+        <View className="mb-6">
           {!isScanning ? (
-            <Button
-              className="w-full bg-[#1A1A1A] text-white rounded-xl py-3.5 text-sm font-medium border-0"
-              onClick={this.handleStartScan}
-            >
+            <Button className="r-btn-primary" onClick={this.handleStartScan}>
               开始扫描
             </Button>
           ) : (
-            <Button
-              className="w-full bg-white text-[#1A1A1A] rounded-xl py-3.5 text-sm font-medium border border-[#E5E2DD]"
-              onClick={this.handleStopScan}
-            >
+            <Button className="r-btn-secondary" onClick={this.handleStopScan}>
               停止扫描
             </Button>
           )}
@@ -266,52 +295,51 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
 
         {/* 扫描指示 */}
         {isScanning && (
-          <View className="flex items-center justify-center mb-5">
-            <View className="scanning-dot mr-2" />
-            <Text className="text-[#999] text-xs tracking-wide">正在搜索设备...</Text>
+          <View className="flex items-center justify-center mb-6">
+            <View className="r-scanning-dot mr-3" />
+            <Text className="text-[var(--r-text-muted)] text-xs">正在搜索设备...</Text>
           </View>
         )}
 
         {/* 错误 */}
         {scanError && (
-          <View className="border-l-2 border-[#1A1A1A] pl-3 mb-5">
-            <Text className="text-[#666] text-sm">{scanError}</Text>
+          <View className="r-card mb-4" style={{ borderLeft: '4px solid var(--r-error)' }}>
+            <Text className="text-[var(--r-text-secondary)] text-sm">{scanError}</Text>
           </View>
         )}
 
         {/* 设备列表 */}
         <View>
-          <View className="flex justify-between items-center mb-3">
-            <Text className="text-xs tracking-[0.15em] text-[#999] uppercase">发现的设备</Text>
-            <Text className="text-xs text-[#BBB]">{devices.length}</Text>
+          <View className="flex justify-between items-center mb-4">
+            <Text className="r-card-header" style={{ marginBottom: 0 }}>发现的设备</Text>
+            <Text className="text-[var(--r-text-faint)] text-xs r-mono">{devices.length}</Text>
           </View>
 
           {devices.length === 0 ? (
-            <View className="py-12 items-center">
-              <Text className="text-[#CCC] text-sm">
-                {isScanning ? '' : '暂无设备'}
+            <View className="r-card items-center py-16">
+              <Text className="text-[var(--r-text-faint)] text-sm">
+                {isScanning ? '' : '暂无设备，请先开始扫描'}
               </Text>
             </View>
           ) : (
             devices.map(device => (
               <View
                 key={device.deviceId}
-                className="bg-white rounded-xl p-4 mb-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+                className="r-card mb-3"
                 onClick={() => this.handleSelectDevice(device)}
+                hoverClass="r-card-hover"
               >
                 <View className="flex justify-between items-center">
                   <View className="flex-1">
-                    <Text className="text-[#1A1A1A] font-medium text-sm">{device.name}</Text>
-                    <Text className="text-[#CCC] text-[10px] mt-1 font-mono">{device.deviceId}</Text>
+                    <Text className="text-[var(--r-text)] font-medium text-base">{device.name}</Text>
+                    <Text className="text-[var(--r-text-faint)] text-xs mt-1 r-mono">{device.deviceId}</Text>
                   </View>
-                  <View className="flex items-center gap-1.5">
+                  <View className="flex items-center gap-2">
                     {[1, 2, 3].map(bar => (
                       <View
                         key={bar}
-                        className={`w-[3px] rounded-full ${
-                          bar <= this.getSignalBars(device.RSSI) ? 'bg-[#1A1A1A]' : 'bg-[#E5E2DD]'
-                        }`}
-                        style={{ height: `${bar * 5 + 2}px` }}
+                        className={`r-signal-bar ${bar <= this.getSignalBars(device.RSSI) ? 'r-signal-bar-active' : ''}`}
+                        style={{ height: `${bar * 8 + 4}px` }}
                       />
                     ))}
                   </View>
@@ -327,57 +355,69 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
   // ─── 配网步骤 ───────────────────────────────────────────
 
   renderConfigStep() {
-    const { ssid, password, showPassword, sending, selectedDevice } = this.state
+    const { ssid, password, showPassword, sending, selectedDevice, showWifiList } = this.state
 
     return (
       <View>
-        {/* 已选设备 */}
-        <View className="bg-white rounded-xl p-4 mb-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <View className="flex items-center justify-between mb-2">
-            <Text className="text-xs tracking-[0.15em] text-[#999] uppercase">已连接设备</Text>
-            <View className="flex items-center gap-1.5">
-              <View className="w-1.5 h-1.5 rounded-full bg-[#2D7D46]" />
-              <Text className="text-[10px] text-[#999]">在线</Text>
+        {/* 已连接设备 */}
+        <View className="r-card mb-4">
+          <View className="flex items-center justify-between mb-3">
+            <Text className="r-card-header" style={{ marginBottom: 0 }}>已连接设备</Text>
+            <View className="flex items-center gap-2">
+              <View className="r-dot r-dot-success" />
+              <Text className="text-[var(--r-text-muted)] text-xs">在线</Text>
             </View>
           </View>
-          <Text className="text-[#1A1A1A] font-medium text-sm">{selectedDevice?.name}</Text>
-          <Text className="text-[#CCC] text-[10px] mt-0.5 font-mono">{selectedDevice?.deviceId}</Text>
+          <Text className="text-[var(--r-text)] font-medium text-base">{selectedDevice?.name}</Text>
+          <Text className="text-[var(--r-text-faint)] text-xs mt-1 r-mono">{selectedDevice?.deviceId}</Text>
         </View>
 
         {/* WiFi 表单 */}
-        <View className="bg-white rounded-xl p-4 mb-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <Text className="text-xs tracking-[0.15em] text-[#999] uppercase mb-4">WiFi 配置</Text>
+        <View className="r-card mb-4">
+          <Text className="r-card-header">WiFi 配置</Text>
 
-          <View className="mb-4">
-            <Text className="text-[10px] text-[#999] mb-1.5 tracking-wide">SSID</Text>
-            <Input
-              className="w-full border-b border-[#E5E2DD] py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#CCC]"
-              placeholder="WiFi 名称"
-              value={ssid}
-              onInput={this.handleSSIDChange}
-            />
+          {/* SSID 输入 */}
+          <View className="mb-6">
+            <Text className="text-[var(--r-text-muted)] text-xs mb-2 tracking-wide">WiFi 名称</Text>
+            <View className="flex items-center">
+              <Input
+                className="r-input flex-1"
+                placeholder="输入或选择 WiFi"
+                value={ssid}
+                onInput={this.handleSSIDChange}
+              />
+              <Text
+                className="text-[var(--r-text-muted)] text-xs ml-3"
+                onClick={this.handleScanWifi}
+              >
+                扫描
+              </Text>
+            </View>
           </View>
 
-          <View className="mb-5">
-            <Text className="text-[10px] text-[#999] mb-1.5 tracking-wide">密码</Text>
-            <View className="flex items-center border-b border-[#E5E2DD]">
+          {/* 密码输入 */}
+          <View className="mb-8">
+            <Text className="text-[var(--r-text-muted)] text-xs mb-2 tracking-wide">密码</Text>
+            <View className="flex items-center">
               <Input
-                className="flex-1 py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#CCC]"
-                placeholder="WiFi 密码"
+                className="r-input flex-1"
+                placeholder="WiFi 密码（至少 8 位）"
                 password={!showPassword}
                 value={password}
                 onInput={this.handlePasswordChange}
               />
-              <Text className="text-[10px] text-[#999] pl-2" onClick={this.toggleShowPassword}>
+              <Text
+                className="text-[var(--r-text-muted)] text-xs ml-3"
+                onClick={this.toggleShowPassword}
+              >
                 {showPassword ? '隐藏' : '显示'}
               </Text>
             </View>
           </View>
 
+          {/* 发送按钮 */}
           <Button
-            className={`w-full rounded-xl py-3.5 text-sm font-medium border-0 ${
-              sending ? 'bg-[#E5E2DD] text-[#999]' : 'bg-[#1A1A1A] text-white'
-            }`}
+            className={`r-btn-primary ${sending ? 'r-btn-sending' : ''}`}
             onClick={this.handleSubmit}
             disabled={sending}
           >
@@ -386,10 +426,7 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
         </View>
 
         {/* 断开按钮 */}
-        <Button
-          className="w-full bg-white text-[#999] rounded-xl py-2.5 text-xs font-medium border border-[#E5E2DD]"
-          onClick={this.handleDisconnect}
-        >
+        <Button className="r-btn-secondary" onClick={this.handleDisconnect}>
           断开连接
         </Button>
       </View>
@@ -404,48 +441,48 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
 
     return (
       <View>
-        <View className="bg-white rounded-xl p-6 mb-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] items-center">
+        <View className="r-card items-center mb-6 py-10">
           {/* 状态图标 */}
-          <View className={`w-16 h-16 rounded-full items-center justify-center mb-4 ${
-            isSuccess ? 'bg-[#E8F5E9]' : 'bg-[#FFEBEE]'
-          }`}>
-            <Text className="text-3xl">{isSuccess ? '✓' : '✗'}</Text>
+          <View className={`r-result-icon ${isSuccess ? 'r-result-success' : 'r-result-failed'}`}>
+            <Text className="text-4xl">{isSuccess ? '✓' : '✗'}</Text>
           </View>
 
-          <Text className="text-lg font-semibold text-[#1A1A1A] mb-1">
+          <Text className="r-title mt-4 mb-2">
             {isSuccess ? '配网成功' : '配网失败'}
           </Text>
 
           {configResult?.ip && (
-            <Text className="text-sm text-[#666] font-mono mb-1">IP: {configResult.ip}</Text>
+            <Text className="text-[var(--r-text-secondary)] text-sm r-mono mb-1">
+              IP: {configResult.ip}
+            </Text>
           )}
 
           {configResult?.message && (
-            <Text className="text-xs text-[#999] text-center">{configResult.message}</Text>
+            <Text className="text-[var(--r-text-muted)] text-xs text-center">
+              {configResult.message}
+            </Text>
           )}
 
           {error && (
-            <View className="border-l-2 border-[#C0392B] pl-3 mt-3 w-full">
-              <Text className="text-xs text-[#666]">{error}</Text>
+            <View className="mt-4 w-full" style={{ borderLeft: '4px solid var(--r-error)', paddingLeft: '24px' }}>
+              <Text className="text-[var(--r-text-secondary)] text-xs">{error}</Text>
             </View>
           )}
         </View>
 
         {/* 操作按钮 */}
         <View className="flex gap-3">
-          <Button
-            className="flex-1 bg-[#1A1A1A] text-white rounded-xl py-3 text-sm font-medium border-0"
-            onClick={this.handleRetry}
-          >
-            重新配网
-          </Button>
-          {isSuccess && (
-            <Button
-              className="flex-1 bg-white text-[#1A1A1A] rounded-xl py-3 text-sm font-medium border border-[#E5E2DD]"
-              onClick={this.handleDisconnect}
-            >
-              断开连接
+          <View className="flex-1">
+            <Button className="r-btn-primary" onClick={this.handleRetry}>
+              重新配网
             </Button>
+          </View>
+          {isSuccess && (
+            <View className="flex-1">
+              <Button className="r-btn-secondary" onClick={this.handleDisconnect}>
+                断开连接
+              </Button>
+            </View>
           )}
         </View>
       </View>
@@ -458,14 +495,12 @@ class Provision extends Component<PropsWithChildren, ProvisionState> {
     const { step } = this.state
 
     return (
-      <ScrollView className="min-h-screen bg-[#FAF8F5]" scrollY>
-        <View className="px-5 pt-6 pb-8">
+      <ScrollView className="min-h-screen" scrollY style={{ background: 'var(--r-bg)' }}>
+        <View className="px-5 pt-6 pb-10">
           {/* Header */}
-          <Text className="text-[11px] tracking-[0.2em] text-[#999] uppercase mb-1">Raro</Text>
-          <Text className="text-2xl font-semibold text-[#1A1A1A] mb-1">设备配网</Text>
-          <Text className="text-sm text-[#999] mb-5">
-            扫描并配置 ESP32-C3 设备
-          </Text>
+          <Text className="text-[var(--r-text-muted)] text-xs tracking-[0.2em] uppercase mb-1">Raro</Text>
+          <Text className="r-title mb-1">设备配网</Text>
+          <Text className="r-subtitle mb-6">扫描并配置 ESP32-C3 设备</Text>
 
           {/* 步骤指示器 */}
           {this.renderStepIndicator()}

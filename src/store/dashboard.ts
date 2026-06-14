@@ -70,6 +70,10 @@ class DashboardStore {
     this.commandInput = input
   }
 
+  @action clearEvents() {
+    this.events = []
+  }
+
   @action reset() {
     this.devices = []
     this.wsConnected = false

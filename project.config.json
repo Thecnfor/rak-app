@@ -12,5 +12,17 @@
     "minified": false
   },
   "compileType": "miniprogram",
-  "lazyCodeLoading": "requiredComponents"
+  "lazyCodeLoading": "requiredComponents",
+  "packOptions": {
+    "ignore": [
+      { "type": "folder", "value": "test" },
+      { "type": "folder", "value": "node_modules" },
+      { "type": "file", "value": "**/*.map" },
+      { "type": "file", "value": "**/*.md" },
+      { "type": "file", "value": ".eslintrc.js" },
+      { "type": "file", "value": "tsconfig.json" },
+      { "type": "file", "value": "package.json" },
+      { "type": "file", "value": "pnpm-lock.yaml" }
+    ]
+  }
 }

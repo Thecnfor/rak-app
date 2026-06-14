@@ -67,17 +67,11 @@ class Index extends Component<PropsWithChildren, IndexState> {
       await bleService.enableNotify()
 
       store.setConnectionState('connected')
-      Taro.navigateTo({ url: '/pages/config/index' })
+      Taro.navigateTo({ url: '/pages/provision/index' })
     } catch (error: any) {
       store.setConnectionState('disconnected')
       Taro.showToast({ title: error.message || '连接失败', icon: 'none' })
     }
-  }
-
-  getSignalStrength(rssi: number): string {
-    if (rssi >= -50) return '强'
-    if (rssi >= -70) return '中'
-    return '弱'
   }
 
   getSignalBars(rssi: number): number {
@@ -90,62 +84,52 @@ class Index extends Component<PropsWithChildren, IndexState> {
     const { devices, isScanning, error } = this.state
 
     return (
-      <View className="min-h-screen bg-[#FAF8F5]">
+      <View className="min-h-screen" style={{ background: 'var(--r-bg)' }}>
         <View className="px-5 pt-6 pb-4">
           {/* Header */}
-          <Text className="text-[11px] tracking-[0.2em] text-[#999] uppercase mb-1">Raro</Text>
-          <Text className="text-2xl font-semibold text-[#1A1A1A] mb-1">设备扫描</Text>
-          <Text className="text-sm text-[#999] mb-6">
-            搜索附近的 ESP32-C3 设备
-          </Text>
+          <Text className="text-[var(--r-text-muted)] text-xs tracking-[0.2em] uppercase mb-1">Raro</Text>
+          <Text className="r-title mb-1">设备扫描</Text>
+          <Text className="r-subtitle mb-6">搜索附近的 ESP32-C3 设备</Text>
 
-          {/* Scan Button */}
+          {/* 扫描按钮 */}
           <View className="mb-6">
             {!isScanning ? (
-              <Button
-                className="w-full bg-[#1A1A1A] text-white rounded-xl py-3.5 text-sm font-medium border-0"
-                onClick={this.handleStartScan}
-              >
+              <Button className="r-btn-primary" onClick={this.handleStartScan}>
                 开始扫描
               </Button>
             ) : (
-              <Button
-                className="w-full bg-white text-[#1A1A1A] rounded-xl py-3.5 text-sm font-medium border border-[#E5E2DD]"
-                onClick={this.handleStopScan}
-              >
+              <Button className="r-btn-secondary" onClick={this.handleStopScan}>
                 停止扫描
               </Button>
             )}
           </View>
 
-          {/* Scanning Indicator */}
+          {/* 扫描指示 */}
           {isScanning && (
             <View className="flex items-center justify-center mb-6">
-              <View className="scanning-dot mr-2" />
-              <Text className="text-[#999] text-xs tracking-wide">正在搜索设备...</Text>
+              <View className="r-scanning-dot mr-3" />
+              <Text className="text-[var(--r-text-muted)] text-xs">正在搜索设备...</Text>
             </View>
           )}
 
-          {/* Error */}
+          {/* 错误 */}
           {error && (
-            <View className="border-l-2 border-[#1A1A1A] pl-3 mb-6">
-              <Text className="text-[#666] text-sm">{error}</Text>
+            <View className="r-card mb-4" style={{ borderLeft: '4px solid var(--r-error)' }}>
+              <Text className="text-[var(--r-text-secondary)] text-sm">{error}</Text>
             </View>
           )}
 
-          {/* Device List */}
+          {/* 设备列表 */}
           <View>
-            <View className="flex justify-between items-center mb-3">
-              <Text className="text-xs tracking-[0.15em] text-[#999] uppercase">
-                发现的设备
-              </Text>
-              <Text className="text-xs text-[#BBB]">{devices.length}</Text>
+            <View className="flex justify-between items-center mb-4">
+              <Text className="r-card-header" style={{ marginBottom: 0 }}>发现的设备</Text>
+              <Text className="text-[var(--r-text-faint)] text-xs r-mono">{devices.length}</Text>
             </View>
 
             {devices.length === 0 ? (
-              <View className="py-12 items-center">
-                <Text className="text-[#CCC] text-sm">
-                  {isScanning ? '' : '暂无设备'}
+              <View className="r-card items-center py-16">
+                <Text className="text-[var(--r-text-faint)] text-sm">
+                  {isScanning ? '' : '暂无设备，请先开始扫描'}
                 </Text>
               </View>
             ) : (
@@ -153,26 +137,23 @@ class Index extends Component<PropsWithChildren, IndexState> {
                 {devices.map((device) => (
                   <View
                     key={device.deviceId}
-                    className="bg-white rounded-xl p-4 mb-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+                    className="r-card mb-3"
                     onClick={() => this.handleConnectDevice(device)}
+                    hoverClass="r-card-hover"
                   >
                     <View className="flex justify-between items-center">
                       <View className="flex-1">
-                        <Text className="text-[#1A1A1A] font-medium text-sm">{device.name}</Text>
-                        <Text className="text-[#CCC] text-[10px] mt-1 font-mono">
+                        <Text className="text-[var(--r-text)] font-medium text-base">{device.name}</Text>
+                        <Text className="text-[var(--r-text-faint)] text-xs mt-1 r-mono">
                           {device.deviceId}
                         </Text>
                       </View>
-                      <View className="flex items-center gap-1.5">
+                      <View className="flex items-center gap-2">
                         {[1, 2, 3].map(bar => (
                           <View
                             key={bar}
-                            className={`w-[3px] rounded-full ${
-                              bar <= this.getSignalBars(device.RSSI)
-                                ? 'bg-[#1A1A1A]'
-                                : 'bg-[#E5E2DD]'
-                            }`}
-                            style={{ height: `${bar * 5 + 2}px` }}
+                            className={`r-signal-bar ${bar <= this.getSignalBars(device.RSSI) ? 'r-signal-bar-active' : ''}`}
+                            style={{ height: `${bar * 8 + 4}px` }}
                           />
                         ))}
                       </View>
@@ -182,14 +163,36 @@ class Index extends Component<PropsWithChildren, IndexState> {
               </View>
             )}
           </View>
-        </View>
 
-        {/* Footer */}
-        <View className="px-5 pb-8 mt-auto">
-          <View className="border-t border-[#EEE] pt-4">
-            <Text className="text-[10px] text-[#CCC] text-center">
-              Raro · ESP32-C3 蓝牙配网工具
-            </Text>
+          {/* 快速导航 */}
+          <View className="mt-8">
+            <Text className="r-card-header">快速导航</Text>
+            <View className="flex gap-3">
+              <View
+                className="r-card flex-1 items-center"
+                onClick={() => Taro.switchTab({ url: '/pages/dashboard/index' })}
+                hoverClass="r-card-hover"
+              >
+                <Text className="text-2xl mb-1">🎮</Text>
+                <Text className="text-[var(--r-text)] text-xs font-medium">控制中心</Text>
+              </View>
+              <View
+                className="r-card flex-1 items-center"
+                onClick={() => Taro.switchTab({ url: '/pages/provision/index' })}
+                hoverClass="r-card-hover"
+              >
+                <Text className="text-2xl mb-1">📡</Text>
+                <Text className="text-[var(--r-text)] text-xs font-medium">设备配网</Text>
+              </View>
+              <View
+                className="r-card flex-1 items-center"
+                onClick={() => Taro.switchTab({ url: '/pages/debug/index' })}
+                hoverClass="r-card-hover"
+              >
+                <Text className="text-2xl mb-1">🔧</Text>
+                <Text className="text-[var(--r-text)] text-xs font-medium">调试日志</Text>
+              </View>
+            </View>
           </View>
         </View>
       </View>

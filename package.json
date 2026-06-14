@@ -27,7 +27,9 @@
     "dev:rn": "taro build --type rn --watch",
     "dev:qq": "taro build --type qq --watch",
     "dev:jd": "taro build --type jd --watch",
-    "dev:quickapp": "taro build --type quickapp --watch"
+    "dev:quickapp": "taro build --type quickapp --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix"
   },
   "browserslist": [
     "defaults and fully supports es6-module",
@@ -78,7 +80,6 @@
     "postcss": "^8.4.18",
     "react-refresh": "^0.11.0",
     "sharp": "^0.34.5",
-    "stylelint": "^14.4.0",
     "tailwindcss": "^4.1.18",
     "ts-node": "^10.9.1",
     "tsconfig-paths-webpack-plugin": "^4.0.1",

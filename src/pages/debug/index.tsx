@@ -12,7 +12,13 @@ interface DebugState {
   expandedTutorialSection: number | null
 }
 
+// 日志显示上限，避免渲染过多 DOM 节点
+const MAX_DISPLAY_LOGS = 200
+
 class Debug extends Component<PropsWithChildren, DebugState> {
+  private pendingLogs: LogEntry[] = []
+  private flushTimer: ReturnType<typeof setTimeout> | null = null
+
   state: DebugState = {
     logs: [],
     filterLevel: 'all',
@@ -27,12 +33,24 @@ class Debug extends Component<PropsWithChildren, DebugState> {
 
   componentWillUnmount() {
     logger.offLog(this.handleNewLog)
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+    }
   }
 
+  // 批量更新：100ms 内的日志合并为一次 setState
   handleNewLog = (entry: LogEntry) => {
-    this.setState(prev => ({
-      logs: [...prev.logs, entry],
-    }))
+    this.pendingLogs.push(entry)
+    if (!this.flushTimer) {
+      this.flushTimer = setTimeout(() => {
+        this.flushTimer = null
+        const newLogs = [...this.pendingLogs]
+        this.pendingLogs = []
+        this.setState(prev => ({
+          logs: [...prev.logs, ...newLogs].slice(-MAX_DISPLAY_LOGS),
+        }))
+      }, 100)
+    }
   }
 
   handleClearLogs = () => {

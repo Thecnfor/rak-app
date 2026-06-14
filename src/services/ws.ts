@@ -1,9 +1,64 @@
 import Taro from '@tarojs/taro'
+import { WS_URL } from '../config/env'
 
-// go-kernel WebSocket 地址
-const WS_URL = 'ws://116.205.183.125:8080/ws'
+// ─── WebSocket 事件类型 ──────────────────────────────────────
 
-type WSCallback = (data: any) => void
+export interface WSAsrEvent {
+  traceId: string
+  deviceId: string
+  text: string
+}
+
+export interface WSVoiceReplyEvent {
+  traceId: string
+  deviceId: string
+  voiceReply: string
+  latency: number
+}
+
+export interface WSActionEvent {
+  traceId: string
+  deviceId: string
+  actions: { action: string; priority: number; targetDevice: string }[]
+}
+
+export interface WSChainErrorEvent {
+  traceId: string
+  error: string
+  code: string
+}
+
+export interface WSDeviceStateEvent {
+  deviceId: string
+  status: string
+  data: Record<string, unknown>
+}
+
+export interface WSRawMessage {
+  version?: string
+  type: string
+  trace_id?: string
+  source?: string
+  target?: string
+  timestamp?: number
+  data?: unknown
+}
+
+// 事件映射
+interface WSEventMap {
+  connected: null
+  disconnected: null
+  asr: WSAsrEvent
+  voice_reply: WSVoiceReplyEvent
+  action: WSActionEvent
+  chain_error: WSChainErrorEvent
+  device_state: WSDeviceStateEvent
+  state: WSRawMessage
+  message: WSRawMessage
+  error: unknown
+}
+
+type WSEventCallback<T = unknown> = (data: T) => void
 
 /**
  * go-kernel WebSocket 实时事件服务。
@@ -13,27 +68,27 @@ class WSService {
   private socketTask: Taro.SocketTask | null = null
   private connected: boolean = false
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  private listeners: Map<string, WSCallback[]> = new Map()
+  private listeners: Map<string, WSEventCallback[]> = new Map()
   private shouldReconnect: boolean = true
 
-  on(event: string, callback: WSCallback) {
+  on<K extends keyof WSEventMap>(event: K, callback: WSEventCallback<WSEventMap[K]>) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, [])
     }
-    this.listeners.get(event)!.push(callback)
+    this.listeners.get(event)!.push(callback as WSEventCallback)
   }
 
-  off(event: string, callback: WSCallback) {
+  off<K extends keyof WSEventMap>(event: K, callback: WSEventCallback<WSEventMap[K]>) {
     const callbacks = this.listeners.get(event)
     if (callbacks) {
-      const index = callbacks.indexOf(callback)
+      const index = callbacks.indexOf(callback as WSEventCallback)
       if (index > -1) {
         callbacks.splice(index, 1)
       }
     }
   }
 
-  private emit(event: string, data: any) {
+  private emit<K extends keyof WSEventMap>(event: K, data: WSEventMap[K]) {
     const callbacks = this.listeners.get(event)
     if (callbacks) {
       callbacks.forEach(cb => cb(data))
@@ -64,10 +119,10 @@ class WSService {
 
     this.socketTask.onMessage((res) => {
       try {
-        const msg = JSON.parse(res.data as string)
+        const msg: WSRawMessage = JSON.parse(res.data as string)
         this.handleMessage(msg)
-      } catch (e) {
-        // 忽略非 JSON 消息
+      } catch {
+        console.warn('[ws] 收到非 JSON 消息，已忽略')
       }
     })
 
@@ -117,18 +172,18 @@ class WSService {
     }, 3000)
   }
 
-  private handleMessage(msg: any) {
+  private handleMessage(msg: WSRawMessage) {
     // 处理 state 类型消息（设备状态更新、ASR 结果、语音回复等）
     if (msg.type === 'state' && msg.data) {
-      const data = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data
+      const data = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data as Record<string, unknown>
 
       // 语音回复
       if (data.status === 'voice_reply' || data.voice_reply) {
         this.emit('voice_reply', {
           traceId: msg.trace_id || '',
-          deviceId: data.device_id || '',
-          voiceReply: data.voice_reply || data.text || '',
-          latency: data.latency_ms || 0,
+          deviceId: (data.device_id as string) || '',
+          voiceReply: (data.voice_reply as string) || (data.text as string) || '',
+          latency: (data.latency_ms as number) || 0,
         })
       }
 
@@ -136,16 +191,16 @@ class WSService {
       if (data.text && data.status !== 'voice_reply') {
         this.emit('asr', {
           traceId: msg.trace_id || '',
-          deviceId: data.device_id || '',
-          text: data.text,
+          deviceId: (data.device_id as string) || '',
+          text: data.text as string,
         })
       }
 
       // 设备状态更新
       if (data.device_id && data.status) {
         this.emit('device_state', {
-          deviceId: data.device_id,
-          status: data.status,
+          deviceId: data.device_id as string,
+          status: data.status as string,
           data,
         })
       }
@@ -154,8 +209,8 @@ class WSService {
       if (data.actions && Array.isArray(data.actions)) {
         this.emit('action', {
           traceId: msg.trace_id || '',
-          deviceId: data.device_id || '',
-          actions: data.actions,
+          deviceId: (data.device_id as string) || '',
+          actions: data.actions as WSActionEvent['actions'],
         })
       }
 
@@ -165,10 +220,11 @@ class WSService {
 
     // 处理 error 类型消息
     if (msg.type === 'error') {
+      const errData = msg.data as Record<string, unknown> | undefined
       this.emit('chain_error', {
         traceId: msg.trace_id || '',
-        error: msg.data?.message || '未知错误',
-        code: msg.data?.code || 'UNKNOWN',
+        error: (errData?.message as string) || '未知错误',
+        code: (errData?.code as string) || 'UNKNOWN',
       })
     }
 
